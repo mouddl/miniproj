@@ -1,26 +1,43 @@
 """
 astar.py - Heuristic Search Algorithms (A*, UCS, Greedy, Weighted)
 Phase 2: Deterministic Planning
+
+Compliance:
+- Supports Phase 2.1 (A* Implementation)
+- Supports Phase 2.2 (UCS, Greedy, A* comparison)
+- Supports Experiment E.3 (Heuristic comparison via heuristic argument)
+- Supports Experiment E.4 (Weighted A* via weight argument)
 """
 
 import heapq
-from typing import List, Tuple, Dict, Optional, Callable
 import time
+from typing import List, Tuple, Dict, Optional, Callable
+
+# Dependencies from tools.py (Ensure these exist in tools.py)
 from tools import get_neighbors, is_valid_state
 
 
 def heuristic_manhattan(state: Tuple[int, int], goal: Tuple[int, int]) -> int:
-    """Admissible heuristic: Manhattan distance."""
+    """
+    Admissible heuristic: Manhattan distance.
+    Suitable for 4-directional grid movement with uniform cost.
+    """
     return abs(state[0] - goal[0]) + abs(state[1] - goal[1])
 
 
 def heuristic_zero(state: Tuple[int, int], goal: Tuple[int, int]) -> int:
-    """Zero heuristic: Reduces A* to Uniform Cost Search."""
+    """
+    Zero heuristic: Reduces A* to Uniform Cost Search (Dijkstra).
+    Admissible but not informative.
+    """
     return 0
 
 
 def heuristic_euclidean(state: Tuple[int, int], goal: Tuple[int, int]) -> float:
-    """Euclidean distance heuristic."""
+    """
+    Euclidean distance heuristic.
+    Admissible if movement cost allows diagonals or cost >= geometric distance.
+    """
     return ((state[0] - goal[0]) ** 2 + (state[1] - goal[1]) ** 2) ** 0.5
 
 
@@ -36,16 +53,28 @@ def run_search(
     Generic search function supporting A*, UCS, Greedy, and Weighted A*.
 
     Args:
+        start: Starting coordinate (row, col).
+        goal: Target coordinate (row, col).
+        grid: Dictionary containing grid metadata (rows, cols, obstacles).
         algorithm: 'astar', 'ucs', 'greedy', 'weighted_astar'.
-        weight: Weight for weighted A* (w >= 1).
+        heuristic: Function computing h(n).
+        weight: Weight for weighted A* (w >= 1). Ignored for non-weighted algos.
 
     Returns:
-        Dictionary containing path, cost, and performance metrics.
+        Dictionary containing path, cost, and performance metrics compatible
+        with experiments.py expectations.
     """
     if not is_valid_state(start, grid) or not is_valid_state(goal, grid):
-        return None
+        return {
+            'success': False,
+            'path': None,
+            'cost': float('inf'),
+            'nodes_expanded': 0,
+            'algorithm': algorithm
+        }
 
     # Priority Queue: (f_score, counter, state)
+    # Counter ensures FIFO behavior for ties in f_score
     open_set = []
     counter = 0
     heapq.heappush(open_set, (0, counter, start))
@@ -87,7 +116,7 @@ def run_search(
             if neighbor in closed_set:
                 continue
 
-            tentative_g = g_score[current] + 1  # Uniform cost = 1
+            tentative_g = g_score[current] + 1  # Uniform cost = 1 per step
 
             if neighbor not in g_score or tentative_g < g_score[neighbor]:
                 came_from[neighbor] = current
@@ -95,6 +124,7 @@ def run_search(
 
                 # Calculate f_score based on algorithm type
                 h_val = heuristic(neighbor, goal)
+
                 if algorithm == 'ucs':
                     f_score = tentative_g
                 elif algorithm == 'greedy':
@@ -104,6 +134,7 @@ def run_search(
                 elif algorithm == 'weighted_astar':
                     f_score = tentative_g + weight * h_val
                 else:
+                    # Default to A*
                     f_score = tentative_g + h_val
 
                 counter += 1
@@ -119,7 +150,10 @@ def run_search(
 
 
 def reconstruct_path(came_from: Dict, current: Tuple[int, int]) -> List[Tuple[int, int]]:
-    """Reconstruct the path from goal to start."""
+    """
+    Reconstruct the path from goal to start using parent pointers.
+    Returns list of states from start to goal.
+    """
     path = [current]
     while current in came_from:
         current = came_from[current]
@@ -130,8 +164,9 @@ def reconstruct_path(came_from: Dict, current: Tuple[int, int]) -> List[Tuple[in
 
 def extract_policy(path: List[Tuple[int, int]]) -> Dict[Tuple[int, int], str]:
     """
-    Extract a deterministic policy from a path.
+    Extract a deterministic policy from a planned path.
     Maps state -> action ('up', 'down', 'left', 'right').
+    Required for Phase 3 (Markov Chain Construction).
     """
     policy = {}
     if not path:
@@ -148,5 +183,8 @@ def extract_policy(path: List[Tuple[int, int]]) -> Dict[Tuple[int, int], str]:
         action_vec = (next_state[0] - curr[0], next_state[1] - curr[1])
         policy[curr] = direction_map.get(action_vec, 'stay')
 
-    policy[path[-1]] = 'goal'
+    # Define action at goal as 'goal' (absorbing)
+    if path:
+        policy[path[-1]] = 'goal'
+
     return policy

@@ -271,11 +271,19 @@ def plot_evolution_distribution_essentiel(history: np.ndarray, goal_idx: int, fa
     save_figure(plt.gcf(), f"evolution_distribution_{grid_name}_eps{epsilon}.png")
     plt.show()
 
+
 def export_tableau_resultats(all_results: Dict, markov_results: Dict,
-                            filename: str = "tableau_resultats.csv") -> None:
+                             heuristic_results: List[Dict] = None,
+                             filename: str = "tableau_resultats.csv") -> None:
     """
     Exporter TOUS les résultats dans un CSV formaté pour le rapport
     Séparateur ';', décimale ',' pour compatibilité Excel/LibreOffice
+
+    Args:
+        all_results: Résultats E.1 (algorithmes)
+        markov_results: Résultats E.2 (Markov)
+        heuristic_results: Résultats E.3 (heuristiques) - OPTIONNEL
+        filename: Nom du fichier CSV
     """
     rows = []
 
@@ -291,7 +299,7 @@ def export_tableau_resultats(all_results: Dict, markov_results: Dict,
                 'Coût du chemin': res.get('cost', 'N/A'),
                 'Nœuds développés': res.get('nodes_expanded', 'N/A'),
                 'Nœuds testés (OPEN)': res.get('max_open_size', 'N/A'),
-                "Temps d'exécution (ms)": f"{res.get('execution_time', 0)*1000:.2f}",
+                "Temps d'exécution (ms)": f"{res.get('execution_time', 0) * 1000:.2f}",
                 'Succès': 'Oui'
             })
 
@@ -306,7 +314,21 @@ def export_tableau_resultats(all_results: Dict, markov_results: Dict,
                 'P(GOAL) théorique': f"{metrics.get('prob_goal_theoretical', 0):.4f}",
                 'P(GOAL) simulation': f"{metrics.get('prob_goal_empirical', 0):.4f}",
                 'P(FAIL)': f"{metrics.get('prob_fail', 0):.4f}",
+                'Temps moyen absorption': f"{metrics.get('mean_time_absorption', 0):.2f}",
                 'Écart théorie/simulation': f"{abs(metrics.get('prob_goal_theoretical', 0) - metrics.get('prob_goal_empirical', 0)):.4f}",
+                'Succès': 'Oui'
+            })
+
+    # Résultats Heuristiques (E.3) - NOUVEAU
+    if heuristic_results:
+        for res in heuristic_results:
+            rows.append({
+                'Expérience': 'E.3 - Comparaison heuristiques',
+                'Grille': 'Moyenne',
+                'Heuristique': res.get('heuristique', 'N/A'),
+                'Coût du chemin': res.get('cost', 'N/A'),
+                'Nœuds développés': res.get('nodes_expanded', 'N/A'),
+                "Temps d'exécution (ms)": f"{res.get('execution_time', 0) * 1000:.2f}",
                 'Succès': 'Oui'
             })
 
@@ -314,3 +336,55 @@ def export_tableau_resultats(all_results: Dict, markov_results: Dict,
     filepath = os.path.join(OUTPUT_DIR, filename)
     df.to_csv(filepath, index=False, sep=';', decimal=',', encoding='utf-8-sig')
     print(f"✓ Tableau exporté : {filepath}")
+
+
+def plot_temps_absorption_vs_epsilon(mean_times: List[float], epsilons: List[float], grid_name: str) -> None:
+    """NOUVEAU : Temps moyen d'absorption vs ε (Matrice Fondamentale)"""
+    plt.figure(figsize=(11, 7))
+    plt.plot(epsilons, mean_times, marker='d', markersize=9, linewidth=3, color='#457B9D',
+             label='Temps moyen d\'absorption', markerfacecolor='white',
+             markeredgecolor='#457B9D', markeredgewidth=2)
+
+    plt.xlabel("Taux d'incertitude ε", fontsize=13, fontweight='bold')
+    plt.ylabel('Nombre moyen d\'étapes', fontsize=13, fontweight='bold')
+    plt.title(f'Temps moyen avant absorption\nGrille {grid_name.capitalize()}',
+              fontsize=15, fontweight='bold', pad=20)
+    plt.legend(fontsize=12, loc='best', frameon=True, fancybox=True)
+    plt.grid(True, alpha=0.3, linestyle='--', linewidth=0.8)
+    plt.xticks(epsilons, [f'{e:.1f}' for e in epsilons], fontsize=11)
+    plt.yticks(fontsize=11)
+
+    plt.tight_layout()
+    save_figure(plt.gcf(), f"temps_absorption_{grid_name}.png")
+    plt.show()
+
+
+def plot_comparaison_heuristiques(results: List[Dict], grid_name: str) -> None:
+    """NOUVEAU : Comparaison heuristiques (E.3)"""
+    plt.figure(figsize=(11, 7))
+
+    x = np.arange(len(results))
+    width = 0.35
+
+    nodes = [r['nodes_expanded'] for r in results]
+    times = [r['execution_time'] * 1000 for r in results]
+
+    fig, ax = plt.subplots(figsize=(11, 7))
+    bars1 = ax.bar(x - width / 2, nodes, width, label='Nœuds développés', color='#2A9D8F')
+    ax2 = ax.twinx()
+    bars2 = ax2.bar(x + width / 2, times, width, label='Temps (ms)', color='#E63946')
+
+    ax.set_xlabel('Heuristique', fontsize=13, fontweight='bold')
+    ax.set_ylabel('Nœuds développés', fontsize=13, fontweight='bold', color='#2A9D8F')
+    ax2.set_ylabel('Temps (ms)', fontsize=13, fontweight='bold', color='#E63946')
+    ax.set_title(f'Comparaison des heuristiques\nGrille {grid_name.capitalize()}',
+                 fontsize=15, fontweight='bold', pad=20)
+    ax.set_xticks(x)
+    ax.set_xticklabels(['h=0 (UCS)', 'Manhattan'], fontsize=11)
+
+    ax.legend(loc='upper left', fontsize=11)
+    ax2.legend(loc='upper right', fontsize=11)
+
+    plt.tight_layout()
+    save_figure(fig, f"comparaison_heuristiques_{grid_name}.png")
+    plt.show()

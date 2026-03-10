@@ -1,7 +1,3 @@
-"""
-main.py - Project Entry Point
-"""
-
 from experiments import run_all_experiments
 
 if __name__ == "__main__":
