@@ -28,69 +28,108 @@ def save_figure(fig, filename: str, dpi: int = 300) -> None:
 
 
 
-def plot_chemin_grille_clair(grid: Dict, paths: Dict[str, List[Tuple[int, int]]],
-                              start: Tuple[int, int], goal: Tuple[int, int],
-                              grid_name: str) -> None:
-    """
-    Diagramme CLAIR: 3 algorithmes superposés sur même grille
-    - Chemins en couleurs distinctes avec marqueurs
-    - START = cercle vert, GOAL = cercle rouge (bien visibles)
-    - Légende explicite
-    """
+
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from matplotlib.patches import Circle
+import os
+
+def plot_chemin_grille_clair(grid: dict, paths: dict, start: tuple, goal: tuple, grid_name: str) -> None:
     rows, cols = grid['rows'], grid['cols']
     grid_map = np.zeros((rows, cols))
 
-    # Obstacles en noir
+    # Obstacles in black
     for (r, c) in grid['obstacles']:
         grid_map[r, c] = 1
 
     plt.figure(figsize=(11, 11))
-    ax = sns.heatmap(grid_map, cmap='Greys', cbar=False, linewidths=0.8,
-                    linecolor='gray', xticklabels=False, yticklabels=False)
+    ax = sns.heatmap(
+        grid_map,
+        cmap='Greys',
+        cbar=False,
+        linewidths=0.8,
+        linecolor='gray',
+        xticklabels=False,
+        yticklabels=False
+    )
 
-    # Couleurs et styles pour chaque algorithme
+    # Colors and styles for each algorithm
     styles = {
-        'astar': {'color': '#E63946', 'label': 'A*', 'marker': 'o', 'linestyle': '-'},
-        'ucs': {'color': '#1D3557', 'label': 'UCS', 'marker': 's', 'linestyle': '--'},
-        'greedy': {'color': '#2A9D8F', 'label': 'Greedy', 'marker': '^', 'linestyle': '-.'}
+        'astar':   {'color': '#E63946', 'label': 'A*',   'marker': 'o', 'offset': (0.0, 0.1), 'zorder': 3},
+        'ucs':     {'color': '#1D3557', 'label': 'UCS',  'marker': 's', 'offset': (0.0, -0.1), 'zorder': 2},
+        'greedy':  {'color': '#2A9D8F', 'label': 'Greedy','marker': '^', 'offset': (0.1, 0.0), 'zorder': 1}
     }
 
-    # Tracer chaque chemin avec style distinct
+    # Plot each path with a small offset
     for algo, path in paths.items():
         if path and algo in styles:
             style = styles[algo]
-            path_y = [p[1] + 0.5 for p in path]
-            path_x = [p[0] + 0.5 for p in path]
-            plt.plot(path_y, path_x,
-                    color=style['color'],
-                    linewidth=2.5,
-                    marker=style['marker'],
-                    markersize=4,
-                    markevery=2,  # Afficher un marqueur sur 2 pour lisibilité
-                    linestyle=style['linestyle'],
-                    label=f"Chemin {style['label']}",
-                    markerfacecolor='white',
-                    markeredgecolor=style['color'],
-                    markeredgewidth=1.5)
+            offset_y, offset_x = style['offset']
+            path_y = [p[1] + 0.5 + offset_y for p in path]
+            path_x = [p[0] + 0.5 + offset_x for p in path]
+            plt.plot(
+                path_y, path_x,
+                color=style['color'],
+                linewidth=2.5,
+                marker=style['marker'],
+                markersize=6,
+                markevery=2,
+                linestyle='-',
+                label=f"Chemin {style['label']}",
+                zorder=style['zorder'],
+                markerfacecolor='white',
+                markeredgecolor=style['color'],
+                markeredgewidth=1.5
+            )
 
-    # START et GOAL bien visibles (cercles avec bordure blanche)
-    start_circle = Circle((start[1] + 0.5, start[0] + 0.5), radius=0.45,
-                         facecolor='limegreen', edgecolor='white',
-                         linewidth=3, label='Départ (s₀)', zorder=10)
-    goal_circle = Circle((goal[1] + 0.5, goal[0] + 0.5), radius=0.45,
-                        facecolor='crimson', edgecolor='white',
-                        linewidth=3, label='But (g)', zorder=10)
+    # START and GOAL (visible circles with white border)
+    start_circle = Circle(
+        (start[1] + 0.5, start[0] + 0.5),
+        radius=0.45,
+        facecolor='limegreen',
+        edgecolor='white',
+        linewidth=3,
+        label='Départ (s₀)',
+        zorder=10
+    )
+    goal_circle = Circle(
+        (goal[1] + 0.5, goal[0] + 0.5),
+        radius=0.45,
+        facecolor='crimson',
+        edgecolor='white',
+        linewidth=3,
+        label='But (g)',
+        zorder=10
+    )
     ax.add_patch(start_circle)
     ax.add_patch(goal_circle)
 
-    # Légende claire
-    plt.legend(loc='upper right', fontsize=10, frameon=True, fancybox=True, shadow=True)
+    # Clean legend
+    plt.legend(
+        loc='upper right',
+        fontsize=10,
+        frameon=True,
+        fancybox=True,
+        shadow=True,
+        facecolor='white'
+    )
 
-    plt.title(f'Comparaison des chemins - Grille {grid_name.capitalize()}',
-              fontsize=15, fontweight='bold', pad=25)
+    plt.title(
+        f'Comparaison des chemins - Grille {grid_name.capitalize()}',
+        fontsize=15,
+        fontweight='bold',
+        pad=25
+    )
     plt.tight_layout()
-    save_figure(plt.gcf(), f"comparaison_chemins_{grid_name}.png")
+
+    # Save to 'resultat' directory
+    if not os.path.exists('resultat'):
+        os.makedirs('resultat')
+    plt.savefig(f"resultat/comparaison_chemins_{grid_name}.png", dpi=200, bbox_inches='tight')
     plt.show()
+
+
 
 
 
