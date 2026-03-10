@@ -1,0 +1,15 @@
+﻿Expérience;Grille;Algorithme;Coût du chemin;Nœuds développés;Nœuds testés (OPEN);Temps d'exécution (ms);Succès;ε;P(GOAL) théorique;P(GOAL) simulation;P(FAIL);Écart théorie/simulation
+E.1 - Comparaison algorithmes;Facile;UCS;18,0;95,0;9,0;0.48;Oui;;;;;
+E.1 - Comparaison algorithmes;Facile;GREEDY;18,0;19,0;16,0;0.12;Oui;;;;;
+E.1 - Comparaison algorithmes;Facile;ASTAR;18,0;95,0;9,0;0.45;Oui;;;;;
+E.1 - Comparaison algorithmes;Moyenne;UCS;28,0;211,0;13,0;0.72;Oui;;;;;
+E.1 - Comparaison algorithmes;Moyenne;GREEDY;28,0;29,0;26,0;0.11;Oui;;;;;
+E.1 - Comparaison algorithmes;Moyenne;ASTAR;28,0;211,0;13,0;0.72;Oui;;;;;
+E.1 - Comparaison algorithmes;Difficile;UCS;38,0;320,0;16,0;1.31;Oui;;;;;
+E.1 - Comparaison algorithmes;Difficile;GREEDY;38,0;39,0;37,0;0.26;Oui;;;;;
+E.1 - Comparaison algorithmes;Difficile;ASTAR;38,0;318,0;16,0;2.15;Oui;;;;;
+E.2 - Impact de ε (Markov);Moyenne;A* + Markov;;;;;Oui;0.0;1.0000;1.0000;0.0000;0.0000
+E.2 - Impact de ε (Markov);Moyenne;A* + Markov;;;;;Oui;0.1;0.0548;0.0610;0.4786;0.0062
+E.2 - Impact de ε (Markov);Moyenne;A* + Markov;;;;;Oui;0.2;0.0021;0.0010;0.5013;0.0011
+E.2 - Impact de ε (Markov);Moyenne;A* + Markov;;;;;Oui;0.3;0.0001;0.0000;0.5005;0.0001
+E.2 - Impact de ε (Markov);Moyenne;A* + Markov;;;;;Oui;0.4;0.0000;0.0000;0.5001;0.0000
