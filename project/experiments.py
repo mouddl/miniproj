@@ -8,17 +8,19 @@ from markov import (
     build_transition_matrix,
     compute_state_evolution,
     simulate_trajectories,
-    calculate_absorption_metrics  # ← NOUVEAU : Matrice fondamentale
+    calculate_absorption_metrics
 )
 from visualisation import (
     plot_chemin_grille_clair,
     plot_performance_par_difficulte,
     plot_probabilites_absorption_essentiel,
     plot_evolution_distribution_essentiel,
-    plot_temps_absorption_vs_epsilon,  # ← NOUVEAU : À ajouter dans visualisation.py
-    plot_comparaison_heuristiques,     # ← NOUVEAU : À ajouter dans visualisation.py
+    plot_temps_absorption_vs_epsilon,
+    plot_comparaison_heuristiques,
     export_tableau_resultats
 )
+
+OUTPUT_DIR = "resultats"
 
 def run_experiment_1_comparaison_algorithmes():
     """E.1 : Comparer UCS vs Greedy vs A* sur 3 grilles"""
@@ -76,8 +78,8 @@ def run_experiment_3_comparaison_heuristiques():
     grid, start, goal = case['grid'], case['start'], case['goal']
 
     heuristics = [
-        ('heuristic_zero', heuristic_zero),
-        ('heuristic_manhattan', heuristic_manhattan)
+        ('heuristic_zero (UCS)', heuristic_zero),
+        ('heuristic_manhattan (A*)', heuristic_manhattan)
     ]
 
     results = []
@@ -93,15 +95,12 @@ def run_experiment_3_comparaison_heuristiques():
             })
             print(f"  ✓ {h_name}: Coût={res['cost']}, Développés={res['nodes_expanded']}")
 
-    # Diagramme E.3
     plot_comparaison_heuristiques(results, grid_name)
     return results
 
 
 def run_experiment_2_markov_essentiel():
-    """
-    E.2 : Diagrammes Markov COMPLETS (incluant matrice fondamentale)
-    """
+    """E.2 : Analyse Markov complète avec fallback simulation"""
     print("\n=== Expérience E.2 : Analyse Markov complète ===")
     grid_name = 'moyenne'
     case = generate_test_case(grid_name)
@@ -117,9 +116,8 @@ def run_experiment_2_markov_essentiel():
 
     markov_results = {grid_name: {}}
     goal_probs, fail_probs = [], []
-    mean_times = []  # ← NOUVEAU : Temps moyens d'absorption
+    mean_times = []
 
-    # Préparer indices Markov
     P_ref, state_list = build_transition_matrix(policy, grid, epsilon=0.1, goal_state=goal)
     state_to_idx = {s: i for i, s in enumerate(state_list)}
     start_idx = state_to_idx[start]
@@ -129,27 +127,37 @@ def run_experiment_2_markov_essentiel():
     for eps in epsilons:
         P, _ = build_transition_matrix(policy, grid, epsilon=eps, goal_state=goal)
 
-        # Calcul théorique π(n) = π(0) P^n
         pi0 = np.zeros(P.shape[0])
         pi0[start_idx] = 1.0
         history = compute_state_evolution(pi0, P, steps=100)
         prob_goal = history[-1, goal_idx]
         prob_fail = history[-1, fail_idx]
 
-        # ← NOUVEAU : Matrice fondamentale (N = (I-Q)^{-1})
         absorption_metrics = calculate_absorption_metrics(P, goal_idx, fail_idx)
         mean_time = 0.0
+
         if 'error' not in absorption_metrics and 'mean_time_vector' in absorption_metrics:
-            # Trouver l'indice de start dans les états transitoires
             transient_indices = absorption_metrics.get('transient_indices', [])
             if start_idx in transient_indices:
                 local_idx = transient_indices.index(start_idx)
-                mean_time = absorption_metrics['mean_time_vector'][local_idx]
+                candidate_time = absorption_metrics['mean_time_vector'][local_idx]
+                if candidate_time > 0 and np.isfinite(candidate_time):
+                    mean_time = candidate_time
+                else:
+                    sim_res = simulate_trajectories(P, start_idx, n_trials=1000, max_steps=100,
+                                                   goal_idx=goal_idx, fail_idx=fail_idx)
+                    mean_time = sim_res['avg_steps']
             else:
-                mean_time = 0.0
+                sim_res = simulate_trajectories(P, start_idx, n_trials=1000, max_steps=100,
+                                               goal_idx=goal_idx, fail_idx=fail_idx)
+                mean_time = 0.0 if start_idx == goal_idx else sim_res['avg_steps']
+        else:
+            sim_res = simulate_trajectories(P, start_idx, n_trials=1000, max_steps=100,
+                                           goal_idx=goal_idx, fail_idx=fail_idx)
+            mean_time = sim_res['avg_steps']
+
         mean_times.append(mean_time)
 
-        # Simulation Monte-Carlo pour validation
         sim_res = simulate_trajectories(P, start_idx, n_trials=1000, max_steps=100,
                                        goal_idx=goal_idx, fail_idx=fail_idx)
 
@@ -165,13 +173,9 @@ def run_experiment_2_markov_essentiel():
 
         print(f"ε={eps:.1f} → P(GOAL)={prob_goal:.4f}, Temps moyen={mean_time:.2f} étapes")
 
-    # DIAGRAMME 1/3 : Probabilités d'absorption vs ε
     plot_probabilites_absorption_essentiel(goal_probs, fail_probs, epsilons, grid_name)
-
-    # ← NOUVEAU : DIAGRAMME 2/3 : Temps moyen d'absorption vs ε
     plot_temps_absorption_vs_epsilon(mean_times, epsilons, grid_name)
 
-    # DIAGRAMME 3/3 : Évolution de π(n) pour ε=0.2
     P_eps2, _ = build_transition_matrix(policy, grid, epsilon=0.2, goal_state=goal)
     pi0 = np.zeros(P_eps2.shape[0])
     pi0[start_idx] = 1.0
@@ -187,25 +191,21 @@ def run_all_experiments():
     print("Date : 3 mars 2026")
     print("="*70)
 
-    # E.1 : Comparaison algorithmes (3 grilles)
     all_results = run_experiment_1_comparaison_algorithmes()
-
-    # E.3 : Comparaison heuristiques (recommandé PDF Section 8)
     heuristic_results = run_experiment_3_comparaison_heuristiques()
-
-    # E.2 : Analyse Markov complète (avec matrice fondamentale)
     markov_results = run_experiment_2_markov_essentiel()
 
-    # Export CSV pour le rapport
-    export_tableau_resultats(all_results, markov_results, heuristic_results, "tableau_resultats.csv")
+    export_tableau_resultats(all_results, markov_results, heuristic_results)
 
     print("\n" + "="*70)
     print("✓ Projet terminé avec succès. ")
+    print(f"✓ Tous les diagrammes sont dans le dossier : '{OUTPUT_DIR}/' ")
+    print(f"✓ Fichier CSV prêt pour le rapport : '{OUTPUT_DIR}/tableau_resultats.csv' ")
     print("\nDiagrammes générés (prêts pour le rapport 6-10 pages) : ")
-    print("  📊 comparaison_chemins_*.png : Chemins A*/UCS/Greedy superposés ")
-    print("  📊 performance_par_difficulte.png : 4 métriques séparées ")
-    print("  📊 comparaison_heuristiques.png : h=0 vs Manhattan (E.3) ")
-    print("  📊 probabilites_absorption_*.png : Robustesse vs ε ")
-    print("  📊 temps_absorption_*.png : Temps moyen vs ε (Matrice Fondamentale) ")
-    print("  📊 evolution_distribution_*.png : Convergence Markov ")
-    print("  📄 tableau_resultats.csv : Toutes les données pour tableaux ")
+    print("  📊 comparaison_chemins_*.png")
+    print("  📊 performance_par_difficulte.png")
+    print("  📊 comparaison_heuristiques.png")
+    print("  📊 probabilites_absorption_*.png")
+    print("  📊 temps_absorption_*.png")
+    print("  📊 evolution_distribution_*.png")
+    print("  📄 tableau_resultats.csv")

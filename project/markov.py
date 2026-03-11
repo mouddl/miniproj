@@ -143,8 +143,7 @@ def compute_state_evolution(pi0: np.ndarray, P: np.ndarray, steps: int) -> np.nd
 def calculate_absorption_metrics(P: np.ndarray, goal_idx: int, fail_idx: int) -> Dict:
     """
     Calculate absorption probabilities and mean time using Fundamental Matrix.
-    Decomposes P into Q (transient) and R (absorbing).
-    Supports Phase 4.3 (Absorption Analysis).
+    Version stable avec fallback silencieux.
     """
     n_states = P.shape[0]
     absorbing_indices = [goal_idx, fail_idx]
@@ -153,21 +152,21 @@ def calculate_absorption_metrics(P: np.ndarray, goal_idx: int, fail_idx: int) ->
     if not transient_indices:
         return {'prob_goal': 1.0 if goal_idx in absorbing_indices else 0.0, 'mean_time': 0}
 
-    # Q is submatrix of P restricted to transient states
-    Q = P[np.ix_(transient_indices, transient_indices)]
-    R = P[np.ix_(transient_indices, absorbing_indices)]
-
-    # Fundamental Matrix N = (I - Q)^-1
     try:
+        Q = P[np.ix_(transient_indices, transient_indices)]
+        R = P[np.ix_(transient_indices, absorbing_indices)]
+
         I = np.eye(len(transient_indices))
-        N = np.linalg.inv(I - Q)
+        I_minus_Q = I - Q
 
-        # Absorption probabilities B = N * R
-        B = N @ R
+        if np.linalg.cond(I_minus_Q) > 1e12:
+            raise np.linalg.LinAlgError("Matrice mal conditionnée")
 
-        # Mean time to absorption t = N * 1_vector
         ones = np.ones((len(transient_indices), 1))
-        t = N @ ones
+        t = np.linalg.solve(I_minus_Q, ones)
+
+        N = np.linalg.inv(I_minus_Q)
+        B = N @ R
 
         return {
             'absorption_matrix': B,
@@ -175,10 +174,9 @@ def calculate_absorption_metrics(P: np.ndarray, goal_idx: int, fail_idx: int) ->
             'transient_indices': transient_indices,
             'absorbing_indices': absorbing_indices
         }
+
     except np.linalg.LinAlgError:
-        return {'error': 'Singular matrix, cannot compute fundamental matrix'}
-
-
+        return {'error': 'Matrice fondamentale non calculable (fallback simulation recommandé)'}
 def simulate_trajectories(
         P: np.ndarray,
         start_idx: int,
